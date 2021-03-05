@@ -5,11 +5,17 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.batfish.common.VendorConversionException;
+import org.batfish.datamodel.AclAclLine;
+import org.batfish.datamodel.AclLine;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.ConfigurationFormat;
 import org.batfish.datamodel.DeviceModel;
+import org.batfish.datamodel.ExprAclLine;
+import org.batfish.datamodel.IpAccessList;
 import org.batfish.datamodel.LineAction;
 import org.batfish.datamodel.Vrf;
 import org.batfish.vendor.VendorConfiguration;
@@ -81,6 +87,14 @@ public class FortiosConfiguration extends VendorConfiguration {
     // TODO: verify
     c.setDefaultInboundAction(LineAction.DENY);
 
+    // Convert addresses
+    _addresses
+        .values()
+        .forEach(address -> c.getIpSpaces().put(address.getName(), address.toIpSpace()));
+
+    // Convert policies
+    _policies.values().forEach(policy -> convertPolicy(policy, c));
+
     // Convert interfaces
     _interfaces.values().forEach(iface -> convertInterface(iface, c));
 
@@ -96,6 +110,7 @@ public class FortiosConfiguration extends VendorConfiguration {
     if (vrf == null) {
       vrf = Vrf.builder().setOwner(c).setName(vrfName).build();
     }
+    IpAccessList outgoingFilter = generateOutgoingFilter(iface, c);
     // TODO Handle interface type
     org.batfish.datamodel.Interface.builder()
         .setOwner(c)
@@ -106,10 +121,51 @@ public class FortiosConfiguration extends VendorConfiguration {
         .setAddress(iface.getIp())
         .setMtu(iface.getMtuEffective())
         .setType(iface.getType().toViType())
+        // TODO Check if this should be original flow filter (i.e. if policies act on pre-NAT flows)
+        .setOutgoingFilter(outgoingFilter)
         .build();
+  }
+
+  private @Nullable IpAccessList generateOutgoingFilter(Interface iface, Configuration c) {
+    List<IpAccessList> viPolicies =
+        _policies.values().stream()
+            .filter(policy -> policy.getDstIntf().contains(iface.getName()))
+            .map(policy -> c.getIpAccessLists().get(policy.getNumber()))
+            .filter(Objects::nonNull)
+            .collect(ImmutableList.toImmutableList());
+    if (viPolicies.isEmpty()) {
+      return null;
+    } else if (viPolicies.size() == 1) {
+      return viPolicies.get(0);
+    }
+    ImmutableList.Builder<AclLine> lines = ImmutableList.builder();
+    viPolicies.stream()
+        .map(IpAccessList::getName)
+        .map(policyName -> new AclAclLine("Match policy " + policyName, policyName))
+        .forEach(lines::add);
+    lines.add(ExprAclLine.ACCEPT_ALL); // TODO Check default action
+    return IpAccessList.builder()
+        .setOwner(c)
+        .setName(outgoingFilterName(iface.getName()))
+        .setLines(lines.build())
+        .build();
+  }
+
+  private void convertPolicy(Policy policy, Configuration c) {
+    if (policy.getStatusEffective() == Policy.Status.DISABLE) {
+      // Ignore disabled policy
+      return;
+    }
+    // TODO: Should we incorporate policy.getName() it its name if present?
+    // TODO: Might need to generate IpAccessList names per VRF/VDOM
+    c.getIpAccessLists().put(policy.getNumber(), policy.toIpAccessList());
   }
 
   private static String vrfName(String vdom, int vrf) {
     return String.format("%s:%s", vdom, vrf);
+  }
+
+  private static String outgoingFilterName(String iface) {
+    return String.format("~%s~outgoing~", iface);
   }
 }
