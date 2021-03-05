@@ -10,6 +10,7 @@ import static org.batfish.datamodel.matchers.ConfigurationMatchers.hasHostname;
 import static org.batfish.datamodel.matchers.MapMatchers.hasKeys;
 import static org.batfish.main.BatfishTestUtils.TEST_SNAPSHOT;
 import static org.batfish.main.BatfishTestUtils.configureBatfishTestSettings;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasEntry;
@@ -41,6 +42,8 @@ import org.batfish.representation.fortios.FortiosConfiguration;
 import org.batfish.representation.fortios.Interface;
 import org.batfish.representation.fortios.Interface.Status;
 import org.batfish.representation.fortios.Interface.Type;
+import org.batfish.representation.fortios.Policy;
+import org.batfish.representation.fortios.Policy.Action;
 import org.batfish.representation.fortios.Service;
 import org.batfish.representation.fortios.Service.Protocol;
 import org.junit.Rule;
@@ -338,6 +341,50 @@ public final class FortiosGrammarTest {
                 hasComment(
                     "Cannot set UDP port range for service setting props for wrong protocol when"
                         + " protocol is not set to TCP/UDP/SCTP."))));
+  }
+
+  @Test
+  public void testFirewallPolicyExtraction() {
+    String hostname = "firewall_policy";
+    FortiosConfiguration vc = parseVendorConfig(hostname);
+
+    Map<String, Policy> policies = vc.getPolicies();
+    assertThat(policies, hasKeys(contains("0", "4294967294", "1")));
+    Map<String, Service> services = vc.getServices();
+    assertThat(services, hasKeys(contains("custom_tcp_11", "custom_tcp_11_to_12")));
+
+    Policy policyDisable = policies.get("0");
+    Policy policyDeny = policies.get("4294967294");
+    Policy policyAllow = policies.get("1");
+
+    Service service11 = services.get("custom_tcp_11");
+    Service service11To12 = services.get("custom_tcp_11_to_12");
+
+    assertThat(policyDisable.getAction(), equalTo(Action.DENY));
+    assertThat(policyDisable.getStatus(), equalTo(Policy.Status.DISABLE));
+    assertThat(policyDisable.getStatusEffective(), equalTo(Policy.Status.DISABLE));
+    assertThat(policyDisable.getService(), contains(service11));
+    assertThat(policyDisable.getSrcIntf(), contains("port1"));
+    assertThat(policyDisable.getDstIntf(), contains("port2"));
+
+    assertThat(policyDeny.getAction(), nullValue());
+    assertThat(policyDeny.getActionEffective(), equalTo(Action.DENY));
+    assertThat(policyDeny.getComments(), equalTo("firewall policy comments"));
+    assertThat(policyDeny.getName(), equalTo("longest allowed firewall policy nam"));
+    assertThat(policyDeny.getStatus(), nullValue());
+    assertThat(policyDeny.getStatusEffective(), equalTo(Policy.Status.ENABLE));
+    assertThat(policyDeny.getService(), contains(service11To12));
+    assertThat(policyDeny.getSrcIntf(), contains("port1"));
+    assertThat(policyDeny.getDstIntf(), contains("port2"));
+
+    assertThat(policyAllow.getAction(), equalTo(Action.ALLOW));
+    assertThat(policyAllow.getStatus(), equalTo(Policy.Status.ENABLE));
+    assertThat(policyAllow.getStatusEffective(), equalTo(Policy.Status.ENABLE));
+    assertThat(policyAllow.getService(), contains(service11));
+    assertThat(policyAllow.getSrcIntf(), contains("port1"));
+    // Multiple str doesn't work yet...
+    // assertThat(policyAllow.getDstIntf(), containsInAnyOrder("port1", "port2"));
+    assertThat(policyAllow.getDstIntf(), containsInAnyOrder("port2"));
   }
 
   private static final BddTestbed BDD_TESTBED =
