@@ -11,6 +11,7 @@ import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.ConfigurationFormat;
 import org.batfish.datamodel.DeviceModel;
 import org.batfish.datamodel.LineAction;
+import org.batfish.datamodel.Vrf;
 import org.batfish.vendor.VendorConfiguration;
 
 public class FortiosConfiguration extends VendorConfiguration {
@@ -79,6 +80,36 @@ public class FortiosConfiguration extends VendorConfiguration {
     c.setDefaultCrossZoneAction(LineAction.DENY);
     // TODO: verify
     c.setDefaultInboundAction(LineAction.DENY);
+
+    // Convert interfaces
+    _interfaces.values().forEach(iface -> convertInterface(iface, c));
+
     return c;
+  }
+
+  private void convertInterface(Interface iface, Configuration c) {
+    String vdom = iface.getVdom();
+    assert vdom != null; // An interface with no VDOM set should fail in extraction
+    String vrfName = vrfName(vdom, iface.getVrfEffective());
+    // TODO Does referencing a VRF from an interface implicitly create it?
+    Vrf vrf = c.getVrfs().get(vrfName);
+    if (vrf == null) {
+      vrf = Vrf.builder().setOwner(c).setName(vrfName).build();
+    }
+    // TODO Handle interface type
+    org.batfish.datamodel.Interface.builder()
+        .setOwner(c)
+        .setName(iface.getName())
+        .setVrf(vrf)
+        .setDescription(iface.getDescription())
+        .setActive(iface.getStatusEffective())
+        .setAddress(iface.getIp())
+        .setMtu(iface.getMtuEffective())
+        .setType(iface.getType().toViType())
+        .build();
+  }
+
+  private static String vrfName(String vdom, int vrf) {
+    return String.format("%s:%s", vdom, vrf);
   }
 }
