@@ -39,7 +39,7 @@ public final class Interface implements Serializable {
         case UNKNOWN:
         case WL_MESH:
         default:
-          throw new IllegalStateException("Do not know about this interface type");
+          throw new UnsupportedOperationException("Do not know about this interface type");
       }
     }
   }
