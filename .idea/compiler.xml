@@ -7,30 +7,30 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="allinone" />
         <module name="symbolic" />
-        <module name="batfish-common-protocol" />
         <module name="build-tools" />
-        <module name="minesweeper" />
         <module name="bdd" />
-        <module name="batfish" />
         <module name="coordinator" />
         <module name="question" />
+        <module name="batfish-common-protocol" />
+        <module name="batfish" />
         <module name="batfish-client" />
+        <module name="allinone" />
+        <module name="minesweeper" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="allinone" target="1.8" />
-      <module name="batfish" target="1.8" />
-      <module name="batfish-client" target="1.8" />
-      <module name="batfish-common-protocol" target="1.8" />
-      <module name="batfish-parent" target="1.5" />
-      <module name="bdd" target="1.8" />
-      <module name="build-tools" target="1.8" />
-      <module name="coordinator" target="1.8" />
-      <module name="minesweeper" target="1.8" />
-      <module name="question" target="1.8" />
-      <module name="symbolic" target="1.8" />
+      <module name="allinone" target="11" />
+      <module name="batfish" target="11" />
+      <module name="batfish-client" target="11" />
+      <module name="batfish-common-protocol" target="11" />
+      <module name="batfish-parent" target="11" />
+      <module name="bdd" target="11" />
+      <module name="build-tools" target="11" />
+      <module name="coordinator" target="11" />
+      <module name="minesweeper" target="11" />
+      <module name="question" target="11" />
+      <module name="symbolic" target="11" />
     </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
